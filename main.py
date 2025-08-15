@@ -187,11 +187,20 @@ def generate():
         except ValueError:
             pass  # ignore non-numeric inputs
 
-    # Store total in data
     data["total"] = str(round(total, 2))
 
     pdf_bytes = fill_pdf("template.pdf", data)
-    return send_file(pdf_bytes, as_attachment=True, download_name="filled.pdf", mimetype="application/pdf")
+
+    # Use user's name in download filename (safe format)
+    user_name = data.get("name", "document").strip().replace(" ", "_")
+    filename = f"{user_name}.pdf"
+
+    return send_file(
+        pdf_bytes,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/pdf"
+    )
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
