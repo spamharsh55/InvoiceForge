@@ -26,6 +26,20 @@ HTML_FORM = """
         .charges-table th, .charges-table td { border: 1px solid #ccc; padding: 8px; }
         .charges-table th { background: #f0f0f0; }
     </style>
+    <script>
+        function updateTotal() {
+            let fields = [
+                "cf_charges", "godown_rent", "courier_charges", "electric_bill",
+                "internet_charges", "local_freight", "labour_charges", "hamali_charges"
+            ];
+            let total = 0;
+            fields.forEach(id => {
+                let val = parseFloat(document.querySelector(`[name="${id}"]`).value) || 0;
+                total += val;
+            });
+            document.querySelector('[name="total"]').value = total.toFixed(2);
+        }
+    </script>
 </head>
 <body>
     <h1>Fill PDF Template</h1>
@@ -57,50 +71,17 @@ HTML_FORM = """
                 <th>Amount</th>
                 <th>Remarks</th>
             </tr>
+            {% for charge, remarks in charge_fields %}
             <tr>
-                <td>CF Charges</td>
-                <td><input name="cf_charges"></td>
-                <td><input name="cf_remarks"></td>
+                <td>{{ charge.replace('_', ' ').title() }}</td>
+                <td><input name="{{ charge }}" oninput="updateTotal()"></td>
+                <td><input name="{{ remarks }}"></td>
             </tr>
-            <tr>
-                <td>Godown Rent</td>
-                <td><input name="godown_rent"></td>
-                <td><input name="godown_remarks"></td>
-            </tr>
-            <tr>
-                <td>Courier Charges</td>
-                <td><input name="courier_charges"></td>
-                <td><input name="courier_remarks"></td>
-            </tr>
-            <tr>
-                <td>Electric Bill</td>
-                <td><input name="electric_bill"></td>
-                <td><input name="electric_remarks"></td>
-            </tr>
-            <tr>
-                <td>Internet Charges</td>
-                <td><input name="internet_charges"></td>
-                <td><input name="internet_remarks"></td>
-            </tr>
-            <tr>
-                <td>Local Freight</td>
-                <td><input name="local_freight"></td>
-                <td><input name="local_remarks"></td>
-            </tr>
-            <tr>
-                <td>Labour Charges</td>
-                <td><input name="labour_charges"></td>
-                <td><input name="labour_remarks"></td>
-            </tr>
-            <tr>
-                <td>Hamali Charges</td>
-                <td><input name="hamali_charges"></td>
-                <td><input name="hamali_remarks"></td>
-            </tr>
+            {% endfor %}
         </table>
 
         <label>Total:</label>
-        <input name="total" required>
+        <input name="total" readonly required>
 
         <button type="submit">Generate PDF</button>
     </form>
@@ -114,7 +95,7 @@ def create_overlay(data):
     can = canvas.Canvas(packet, pagesize=(612, 792))  # Letter size
     
     # Name with larger font
-    can.setFont("Helvetica-Bold", 12)  # Larger + bold for emphasis
+    can.setFont("Helvetica-Bold", 12)
     can.drawString(80, 620, str(data.get("name", "")))
 
     # Rest of the details with normal font
@@ -123,7 +104,7 @@ def create_overlay(data):
     can.drawString(330, 530, str(data.get("from_addr", "")))
     can.drawString(410, 530, str(data.get("to_addr", "")))
 
-    # Charges + Remarks (aligned)
+    # Charges + Remarks
     y_start = 465
     step = 17
     charge_fields = [
@@ -170,11 +151,45 @@ def fill_pdf(template_path, data):
 
 @app.route("/", methods=["GET"])
 def form():
-    return render_template_string(HTML_FORM)
+    charge_fields = [
+        ("cf_charges", "cf_remarks"),
+        ("godown_rent", "godown_remarks"),
+        ("courier_charges", "courier_remarks"),
+        ("electric_bill", "electric_remarks"),
+        ("internet_charges", "internet_remarks"),
+        ("local_freight", "local_remarks"),
+        ("labour_charges", "labour_remarks"),
+        ("hamali_charges", "hamali_remarks"),
+    ]
+    return render_template_string(HTML_FORM, charge_fields=charge_fields)
 
 @app.route("/generate", methods=["POST"])
 def generate():
     data = {key: request.form[key] for key in request.form}
+
+    # List of charge field names
+    charge_fields = [
+        "cf_charges",
+        "godown_rent",
+        "courier_charges",
+        "electric_bill",
+        "internet_charges",
+        "local_freight",
+        "labour_charges",
+        "hamali_charges"
+    ]
+
+    # Calculate total
+    total = 0
+    for field in charge_fields:
+        try:
+            total += float(data.get(field, 0) or 0)
+        except ValueError:
+            pass  # ignore non-numeric inputs
+
+    # Store total in data
+    data["total"] = str(round(total, 2))
+
     pdf_bytes = fill_pdf("template.pdf", data)
     return send_file(pdf_bytes, as_attachment=True, download_name="filled.pdf", mimetype="application/pdf")
 
