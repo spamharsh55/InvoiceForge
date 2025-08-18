@@ -17,7 +17,8 @@ HTML_FORM = """
         h1 { text-align: center; }
         form { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
         label { font-weight: bold; margin-top: 10px; display: block; }
-        input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; }
+        input, textarea { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; }
+        textarea { resize: vertical; }
         .row { display: flex; gap: 10px; margin-bottom: 10px; }
         .col { flex: 1; }
         button { padding: 10px 20px; background: #4CAF50; border: none; color: white; font-size: 16px; cursor: pointer; border-radius: 4px; }
@@ -46,8 +47,8 @@ HTML_FORM = """
     <form method="post" action="/generate">
         <div class="row">
             <div class="col">
-                <label>Name:</label>
-                <input name="name" required>
+                <label>Name & Address:</label>
+                <textarea name="name" rows="3" required></textarea>
             </div>
             <div class="col">
                 <label>Date:</label>
@@ -94,11 +95,17 @@ def create_overlay(data):
     packet = io.BytesIO()
     can = canvas.Canvas(packet, pagesize=(612, 792))  # Letter size
     
-    # Name with larger font
+    # Handle Name & Address (split by newline)
+    name_lines = str(data.get("name", "")).split("\n")
     can.setFont("Helvetica-Bold", 12)
-    can.drawString(80, 620, str(data.get("name", "")))
-
-    # Rest of the details with normal font
+    if name_lines:
+        can.drawString(80, 620, name_lines[0])  # Name on first line
+    
+    can.setFont("Helvetica", 10)
+    for i, line in enumerate(name_lines[1:], start=1):
+        can.drawString(80, 620 - (i * 14), line)  # Address lines below name
+    
+    # Rest of the details
     can.setFont("Helvetica", 10)
     can.drawString(464, 680, str(data.get("date", "")))
     can.drawString(330, 530, str(data.get("from_addr", "")))
@@ -191,8 +198,8 @@ def generate():
 
     pdf_bytes = fill_pdf("template.pdf", data)
 
-    # Use user's name in download filename (safe format)
-    user_name = data.get("name", "document").strip().replace(" ", "_")
+    # Use user's name (first line only) in download filename
+    user_name = str(data.get("name", "document")).split("\n")[0].strip().replace(" ", "_")
     filename = f"{user_name}.pdf"
 
     return send_file(
