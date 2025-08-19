@@ -3,113 +3,133 @@ from reportlab.pdfgen import canvas
 from PyPDF2 import PdfReader, PdfWriter
 import io
 import os
+from datetime import datetime
 
 app = Flask(__name__)
 
-# HTML form template
 HTML_FORM = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>PDF Generator</title>
-    <style>
-        body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; }
-        h1 { text-align: center; }
-        form { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        label { font-weight: bold; margin-top: 10px; display: block; }
-        input, textarea { padding: 8px; border: 1px solid #ccc; border-radius: 4px; width: 100%; }
-        textarea { resize: vertical; }
-        .row { display: flex; gap: 10px; margin-bottom: 10px; }
-        .col { flex: 1; }
-        button { padding: 10px 20px; background: #4CAF50; border: none; color: white; font-size: 16px; cursor: pointer; border-radius: 4px; }
-        button:hover { background: #45a049; }
-        .charges-table { border-collapse: collapse; width: 100%; margin-top: 20px; }
-        .charges-table th, .charges-table td { border: 1px solid #ccc; padding: 8px; }
-        .charges-table th { background: #f0f0f0; }
-    </style>
-    <script>
-        function updateTotal() {
-            let fields = [
-                "cf_charges", "godown_rent", "courier_charges", "electric_bill",
-                "internet_charges", "local_freight", "labour_charges", "hamali_charges"
-            ];
-            let total = 0;
-            fields.forEach(id => {
-                let val = parseFloat(document.querySelector(`[name="${id}"]`).value) || 0;
-                total += val;
-            });
-            document.querySelector('[name="total"]').value = total.toFixed(2);
-        }
-    </script>
+  <meta charset="UTF-8">
+  <title>PDF Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    function updateTotal() {
+        let fields = [
+            "cf_charges", "godown_rent", "courier_charges", "electric_bill",
+            "internet_charges", "local_freight", "labour_charges", "hamali_charges"
+        ];
+        let total = 0;
+        fields.forEach(id => {
+            let val = parseFloat(document.querySelector(`[name="${id}"]`).value) || 0;
+            total += val;
+        });
+        document.querySelector('[name="total"]').value = total.toFixed(2);
+    }
+    document.addEventListener("DOMContentLoaded", () => {
+    let today = new Date().toISOString().split("T")[0];
+    document.getElementById("date").value = today;
+  });
+  </script>
 </head>
-<body>
-    <h1>Fill PDF Template</h1>
-    <form method="post" action="/generate">
-        <div class="row">
-            <div class="col">
-                <label>Name & Address:</label>
-                <textarea name="name" rows="3" required></textarea>
-            </div>
-            <div class="col">
-                <label>Date:</label>
-                <input name="date" required>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col">
-                <label>From:</label>
-                <input name="from_addr" required>
-            </div>
-            <div class="col">
-                <label>To:</label>
-                <input name="to_addr" required>
-            </div>
-        </div>
+<body class="bg-gray-100 min-h-screen flex justify-center font-sans">
+  <div class="w-full max-w-4xl bg-white rounded-2xl shadow-lg p-8">
+    <h1 class="text-3xl font-bold text-center text-green-600 mb-6">📄 PDF Generator</h1>
 
-        <table class="charges-table">
+    <form method="post" action="/generate" class="space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <label class="block text-gray-700 font-medium mb-1">Name & Address</label>
+          <textarea name="name" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-green-400" rows="3" required></textarea>
+        </div>
+        <div>
+          <label class="block text-gray-700 font-medium mb-1">Date</label>
+          <input type="date" name="date" id="date" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-green-400" required>
+        </div>
+        <div>
+          <label class="block text-gray-700 font-medium mb-1">From</label>
+          <input type="date" name="from_date" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-green-400" required>
+        </div>
+        <div>
+          <label class="block text-gray-700 font-medium mb-1">To</label>
+          <input type="date" name="to_date" class="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-green-400" required>
+        </div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full border border-gray-300 rounded-lg overflow-hidden">
+          <thead class="bg-gray-100">
             <tr>
-                <th>Charge Type</th>
-                <th>Amount</th>
-                <th>Remarks</th>
+              <th class="px-4 py-2 border">Charge Type</th>
+              <th class="px-4 py-2 border">Amount</th>
+              <th class="px-4 py-2 border">Remarks</th>
             </tr>
+          </thead>
+          <tbody>
             {% for charge, remarks in charge_fields %}
-            <tr>
-                <td>{{ charge.replace('_', ' ').title() }}</td>
-                <td><input name="{{ charge }}" oninput="updateTotal()"></td>
-                <td><input name="{{ remarks }}"></td>
+            <tr class="hover:bg-gray-50">
+              <td class="px-4 py-2 border text-gray-700">{{ charge.replace('_', ' ').title() }}</td>
+              <td class="px-4 py-2 border"><input name="{{ charge }}" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-green-400" oninput="updateTotal()"></td>
+              <td class="px-4 py-2 border"><input name="{{ remarks }}" class="w-full border border-gray-300 rounded-lg p-2 focus:ring-2 focus:ring-green-400"></td>
             </tr>
             {% endfor %}
+          </tbody>
         </table>
+      </div>
 
-        <label>Total:</label>
-        <input name="total" readonly required>
+      <div>
+        <label class="block text-gray-700 font-medium mb-1">Total</label>
+        <input name="total" class="w-full border border-gray-300 rounded-lg p-3 bg-gray-100" readonly required>
+      </div>
 
-        <button type="submit">Generate PDF</button>
+      <div class="text-center">
+        <button type="submit" class="px-6 py-3 bg-green-600 text-white rounded-lg shadow hover:bg-green-700 transition">
+          Generate PDF
+        </button>
+      </div>
     </form>
+  </div>
 </body>
 </html>
 """
+
+def format_date_ddmmyyyy(date_str):
+    """Convert yyyy-mm-dd to dd-mm-yyyy"""
+    try:
+        dt = datetime.strptime(date_str, "%Y-%m-%d")
+        return dt.strftime("%d-%m-%Y")
+    except Exception:
+        return date_str or ""
+
 
 # Function to create overlay
 def create_overlay(data):
     packet = io.BytesIO()
     can = canvas.Canvas(packet, pagesize=(612, 792))  # Letter size
-    
+
     # Handle Name & Address (split by newline)
-    name_lines = str(data.get("name", "")).split("\n")
-    can.setFont("Helvetica-Bold", 12)
+    name_lines = str(data.get("name", "")).splitlines()
+    can.setFont("Times-Bold", 12)
+
     if name_lines:
-        can.drawString(80, 620, name_lines[0])  # Name on first line
-    
-    can.setFont("Helvetica", 10)
+        can.drawString(73, 620, name_lines[0].strip())  # First line (Name)
+
+    can.setFont("Times-Roman", 11)
     for i, line in enumerate(name_lines[1:], start=1):
-        can.drawString(80, 620 - (i * 14), line)  # Address lines below name
-    
-    # Rest of the details
-    can.setFont("Helvetica", 10)
-    can.drawString(464, 680, str(data.get("date", "")))
-    can.drawString(330, 530, str(data.get("from_addr", "")))
-    can.drawString(410, 530, str(data.get("to_addr", "")))
+        clean_line = line.strip()
+        if clean_line:  # Skip blank/empty lines
+            can.drawString(73, 620 - (i * 14), clean_line)
+
+    # Format dates to dd-mm-yyyy
+    date = format_date_ddmmyyyy(data.get("date", ""))
+    from_date = format_date_ddmmyyyy(data.get("from_date", ""))
+    to_date = format_date_ddmmyyyy(data.get("to_date", ""))
+
+    can.setFont("Times-Roman", 10)
+    can.drawString(464, 680, date)
+    can.drawString(330, 530, from_date)
+    can.drawString(410, 530, to_date)
 
     # Charges + Remarks
     y_start = 465
@@ -131,30 +151,33 @@ def create_overlay(data):
         can.drawString(413, y, str(data.get(remark, "")))
 
     # Total
-    can.setFont("Helvetica-Bold", 12)
+    can.setFont("Times-Bold", 12)
     can.drawString(320, 328, str(data.get("total", "")))
 
     can.save()
     packet.seek(0)
     return packet
 
+
 # Merge overlay with template
 def fill_pdf(template_path, data):
     if not os.path.exists(template_path):
         raise FileNotFoundError(f"Template file '{template_path}' not found")
 
-    template_pdf = PdfReader(open(template_path, "rb"))
-    overlay_pdf = PdfReader(create_overlay(data))
+    with open(template_path, "rb") as f:
+        template_pdf = PdfReader(f)
+        overlay_pdf = PdfReader(create_overlay(data))
 
-    writer = PdfWriter()
-    page = template_pdf.pages[0]
-    page.merge_page(overlay_pdf.pages[0])
-    writer.add_page(page)
+        writer = PdfWriter()
+        page = template_pdf.pages[0]
+        page.merge_page(overlay_pdf.pages[0])
+        writer.add_page(page)
 
-    output = io.BytesIO()
-    writer.write(output)
-    output.seek(0)
-    return output
+        output = io.BytesIO()
+        writer.write(output)
+        output.seek(0)
+        return output
+
 
 @app.route("/", methods=["GET"])
 def form():
@@ -170,20 +193,15 @@ def form():
     ]
     return render_template_string(HTML_FORM, charge_fields=charge_fields)
 
+
 @app.route("/generate", methods=["POST"])
 def generate():
     data = {key: request.form[key] for key in request.form}
 
     # List of charge field names
     charge_fields = [
-        "cf_charges",
-        "godown_rent",
-        "courier_charges",
-        "electric_bill",
-        "internet_charges",
-        "local_freight",
-        "labour_charges",
-        "hamali_charges"
+        "cf_charges", "godown_rent", "courier_charges", "electric_bill",
+        "internet_charges", "local_freight", "labour_charges", "hamali_charges"
     ]
 
     # Calculate total
@@ -199,15 +217,16 @@ def generate():
     pdf_bytes = fill_pdf("template.pdf", data)
 
     # Use user's name (first line only) in download filename
-    user_name = str(data.get("name", "document")).split("\n")[0].strip().replace(" ", "_")
+    user_name = str(data.get("name",
+                             "document")).split("\n")[0].strip().replace(
+                                 " ", "_")
     filename = f"{user_name}.pdf"
 
-    return send_file(
-        pdf_bytes,
-        as_attachment=True,
-        download_name=filename,
-        mimetype="application/pdf"
-    )
+    return send_file(pdf_bytes,
+                     as_attachment=True,
+                     download_name=filename,
+                     mimetype="application/pdf")
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
