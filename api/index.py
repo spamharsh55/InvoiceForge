@@ -338,11 +338,12 @@ def create_overlay_pdf(data):
   # ---- Dynamic Charges Table ----
   charges = data.get("charges") or []
 
-  # ✅ Filter out empty/zero charges
+  # ✅ Keep rows if they have either a type, amount, or remark
   filtered_charges = [
       ch for ch in charges
-      if (str(ch.get("type", "")).strip() != "" or str(ch.get("remark", "")).strip() != "")
-      and to_number(ch.get("amount", 0)) > 0
+      if str(ch.get("type", "")).strip() != "" 
+         or str(ch.get("remark", "")).strip() != "" 
+         or to_number(ch.get("amount", 0)) > 0
   ]
 
   # Build table data (header + rows + total)
